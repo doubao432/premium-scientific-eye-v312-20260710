@@ -1,0 +1,2430 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:," />
+  <title>分结构眼球 3D 教学模型 3.1.2</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/": "./vendor/jsm/"
+      }
+    }
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+      --bg: #07090d;
+      --panel: #f8fafc;
+      --panel-2: #eef3f7;
+      --text: #111827;
+      --muted: #647084;
+      --line: #d7dde7;
+      --accent: #1f6fd1;
+      --green: #18b970;
+      --green-2: #3df29b;
+      --warn: #d97706;
+      --dark-text: #eef4ff;
+      --dark-muted: #b8c2d0;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    #app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 448px;
+      height: 100vh;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .stage {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      background:
+        radial-gradient(circle at 42% 34%, rgba(50, 78, 112, 0.52), transparent 34%),
+        linear-gradient(135deg, #101925 0%, #070a0f 56%, #020306 100%);
+    }
+
+    #scene {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #scene.clickable { cursor: pointer; }
+
+    #labels,
+    #tooltipLayer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .label {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(18, 24, 38, 0.10);
+      color: #111827;
+      font-size: 12px;
+      line-height: 1.25;
+      white-space: nowrap;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+    }
+
+    .label.active {
+      background: #e6fff1;
+      border-color: #52d990;
+      color: #063d26;
+      font-weight: 700;
+    }
+
+    .label.answer-hidden {
+      min-width: 28px;
+      text-align: center;
+    }
+
+    .tooltip {
+      position: absolute;
+      transform: translate(12px, 12px);
+      display: none;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(3, 7, 18, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #f8fafc;
+      font-size: 12px;
+      line-height: 1.25;
+      white-space: nowrap;
+    }
+
+    .topbar {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: 16px;
+      z-index: 5;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .title-block {
+      min-width: 260px;
+      max-width: 420px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      background: rgba(7, 10, 15, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(10px);
+    }
+
+    .title-block h1 {
+      margin: 0 0 3px;
+      color: var(--dark-text);
+      font-size: 16px;
+      line-height: 1.25;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .title-block p {
+      margin: 0;
+      color: var(--dark-muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .icon-button,
+    .chip-button {
+      min-height: 38px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius);
+      background: rgba(11, 16, 24, 0.80);
+      color: var(--dark-text);
+      font-size: 13px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+
+    .icon-button {
+      width: 40px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0;
+    }
+
+    .chip-button {
+      padding: 0 11px;
+    }
+
+    .icon-button:hover,
+    .chip-button:hover,
+    .chip-button[aria-pressed="true"] {
+      border-color: rgba(255, 255, 255, 0.38);
+      background: rgba(31, 111, 209, 0.88);
+    }
+
+    .chip-button.good[aria-pressed="true"] {
+      background: rgba(24, 185, 112, 0.88);
+    }
+
+    .stage-footer-overlay {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      z-index: 4;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .view-banner,
+    .control-guide {
+      padding: 9px 11px;
+      border-radius: var(--radius);
+      background: rgba(7, 10, 15, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--dark-muted);
+      font-size: 12px;
+      line-height: 1.35;
+      backdrop-filter: blur(10px);
+    }
+
+    .view-banner {
+      max-width: min(560px, 52%);
+    }
+
+    .view-banner strong {
+      color: #e9fff4;
+      font-weight: 700;
+    }
+
+    .control-guide {
+      display: grid;
+      gap: 3px;
+      max-width: 440px;
+      color: #d8e3f2;
+    }
+
+    .control-guide strong {
+      color: #ffffff;
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      background: var(--panel);
+      color: var(--text);
+      border-left: 1px solid var(--line);
+    }
+
+    .panel-header {
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    .panel-header h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .status {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--green);
+      flex: 0 0 auto;
+    }
+
+    .controls-panel {
+      padding: 8px 10px 8px;
+      border-bottom: 1px solid var(--line);
+      background: #f6f8fb;
+    }
+
+    .search {
+      width: 100%;
+      height: 36px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+      color: var(--text);
+      outline: none;
+    }
+
+    .search:focus {
+      border-color: #72b7eb;
+      box-shadow: 0 0 0 3px rgba(114, 183, 235, 0.18);
+    }
+
+    .section-title {
+      margin: 7px 0 4px;
+      color: #334155;
+      font-size: 12px;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .group-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .segmented-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .segmented-grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .optics-panel {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid #d8e2ee;
+      border-radius: var(--radius);
+      background: #ffffff;
+    }
+
+    .control-line {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      margin-top: 5px;
+      color: #263044;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .control-line strong {
+      font-weight: 700;
+    }
+
+    .range {
+      width: 100%;
+      margin: 2px 0 0;
+      accent-color: #1f6fd1;
+    }
+
+    .option-row {
+      display: grid;
+      grid-template-columns: 68px minmax(0, 1fr);
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .option-label {
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .metric {
+      min-height: 44px;
+      padding: 7px 8px;
+      border: 1px solid #d8e2ee;
+      border-radius: 7px;
+      background: #f8fafc;
+      font-size: 12px;
+      line-height: 1.35;
+      color: #475569;
+    }
+
+    .metric strong {
+      display: block;
+      color: #0f172a;
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+
+    .file-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    .upload-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      margin-top: 7px;
+    }
+
+    .upload-button {
+      min-height: 30px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0 10px;
+      border: 1px solid #b8c5d5;
+      border-radius: 6px;
+      background: #f8fafc;
+      color: #1f2937;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .upload-name {
+      min-width: 0;
+      overflow: hidden;
+      color: #647084;
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .retina-observer {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid #cfd9e6;
+      border-radius: var(--radius);
+      background: #ffffff;
+    }
+
+    .observer-head,
+    .observer-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: #334155;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .observer-head strong {
+      color: #0f172a;
+      font-size: 12px;
+    }
+
+    .clarity-badge {
+      flex: 0 0 auto;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #e8fff3;
+      color: #08633f;
+      font-weight: 700;
+    }
+
+    .clarity-badge.blur {
+      background: #fff2dc;
+      color: #9a4c00;
+    }
+
+    .retina-preview {
+      width: 100%;
+      height: 112px;
+      display: block;
+      margin: 6px 0;
+      border: 1px solid #26364b;
+      border-radius: 6px;
+      background: #101a27;
+    }
+
+    .correction-hint {
+      min-width: 0;
+      overflow: hidden;
+      color: #647084;
+      text-align: right;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .small-button {
+      min-height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #ffffff;
+      color: #1f2937;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 3px 6px;
+    }
+
+    .small-button:hover,
+    .small-button.active {
+      border-color: #86c5a5;
+      background: #eafff3;
+      color: #075f3d;
+    }
+
+    .detail {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-2);
+    }
+
+    .detail-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.16);
+      flex: 0 0 auto;
+    }
+
+    .detail h3 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .detail .en {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .detail p {
+      margin: 8px 0 0;
+      color: #253044;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .meta-row {
+      display: grid;
+      grid-template-columns: 74px 1fr;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .meta-row strong {
+      color: #263044;
+      font-weight: 700;
+    }
+
+    .detail-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .list {
+      flex: 0 0 auto;
+      overflow: visible;
+      padding: 10px;
+    }
+
+    .structure-button {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr) 32px 32px;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 7px;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .structure-button:hover {
+      background: #ffffff;
+      border-color: var(--line);
+    }
+
+    .structure-button.active {
+      background: #ffffff;
+      border-color: #75d9a5;
+      box-shadow: 0 6px 18px rgba(24, 185, 112, 0.13);
+    }
+
+    .structure-button.hidden {
+      opacity: 0.56;
+    }
+
+    .structure-button .name {
+      min-width: 0;
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .structure-button .sub {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mini-icon {
+      width: 32px;
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .mini-icon.off {
+      color: #9aa4b2;
+      background: #eef2f7;
+    }
+
+    .footer {
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    .footer button {
+      min-height: 36px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .footer button.primary {
+      border-color: var(--green);
+      background: var(--green);
+      color: #fff;
+    }
+
+    .loading {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--dark-text);
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      background: rgba(7, 10, 15, 0.76);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 13px;
+      z-index: 9;
+    }
+
+    @media (max-width: 980px) {
+      body { overflow: auto; }
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(430px, 58vh) auto;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+      }
+      .stage { min-height: 430px; height: auto; }
+      .panel {
+        min-height: 560px;
+        height: auto;
+        overflow: visible;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+      .topbar {
+        align-items: flex-start;
+      }
+      .title-block {
+        min-width: 0;
+        width: 100%;
+        max-width: none;
+      }
+      .toolbar {
+        width: 100%;
+      }
+      .chip-button {
+        flex: 1 1 auto;
+      }
+      .stage-footer-overlay {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .view-banner,
+      .control-guide {
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .preset-grid,
+      .group-grid,
+      .metric-grid,
+      .footer {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .detail-actions {
+        grid-template-columns: 1fr;
+      }
+      .structure-button {
+        grid-template-columns: 20px minmax(0, 1fr) 30px 30px;
+        gap: 7px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <main class="stage" id="stage">
+      <canvas id="scene"></canvas>
+      <div id="labels"></div>
+      <div id="tooltipLayer"><div class="tooltip" id="tooltip"></div></div>
+      <div class="topbar">
+        <div class="title-block">
+          <h1>分结构眼球 3D 教学模型 3.1.2</h1>
+          <p>简化写实材质、科学成像光路、视网膜倒像和眼镜矫正。</p>
+        </div>
+        <div class="toolbar">
+          <button class="icon-button" id="resetView" title="重置视角" aria-label="重置视角">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 12a8 8 0 1 0 2.34-5.66M4 4v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="chip-button good" id="toggleXray" aria-pressed="false">50%透视</button>
+          <button class="chip-button good" id="toggleFade" aria-pressed="false">淡化其他</button>
+          <button class="chip-button" id="toggleLabels" aria-pressed="false">标签</button>
+          <button class="chip-button" id="toggleAnswers" aria-pressed="false">隐藏答案</button>
+          <button class="chip-button" id="toggleRotate" aria-pressed="false">旋转</button>
+          <button class="chip-button" id="fullscreen">全屏</button>
+          <button class="chip-button" id="snapshot">截图</button>
+        </div>
+      </div>
+      <div class="stage-footer-overlay">
+        <div class="view-banner" id="viewBanner"><strong>整体剖面</strong>：保持真实原色，点击结构可查看说明。</div>
+        <div class="control-guide" aria-label="三维模型操作说明">
+          <span><strong>电脑</strong>：左键旋转 · 右键平移 · 滚轮缩放</span>
+          <span><strong>平板/白板</strong>：单指旋转 · 双指拖动平移 · 双指捏合缩放</span>
+        </div>
+      </div>
+      <div class="loading" id="loading">正在加载模型...</div>
+    </main>
+    <aside class="panel">
+      <div class="panel-header">
+        <h2>可交互结构</h2>
+        <div class="status"><span class="dot"></span><span id="statusText">等待模型加载</span></div>
+      </div>
+      <section class="controls-panel">
+        <input class="search" id="searchInput" type="search" placeholder="搜索结构，如：巩膜、lens、视网膜" autocomplete="off" />
+        <div class="section-title">课堂预设</div>
+        <div class="preset-grid" id="presetGrid"></div>
+        <div class="section-title">结构分组</div>
+        <div class="group-grid" id="groupGrid"></div>
+        <div class="optics-panel">
+          <div class="section-title">成像调节</div>
+          <div class="control-line"><strong>睫状体收缩</strong><span id="accommodationValue">30%</span></div>
+          <input class="range" id="accommodationSlider" type="range" min="0" max="100" value="30" />
+          <div class="control-line"><strong>物体距离</strong><span id="distanceValue">较远</span></div>
+          <input class="range" id="distanceSlider" type="range" min="0" max="100" value="70" />
+          <div class="option-row">
+            <span class="option-label">眼球状态</span>
+            <div class="segmented-grid three" id="eyeModeButtons">
+              <button class="small-button active" data-eye-mode="normal">正常</button>
+              <button class="small-button" data-eye-mode="myopia">近视</button>
+              <button class="small-button" data-eye-mode="hyperopia">远视</button>
+            </div>
+          </div>
+          <div class="option-row">
+            <span class="option-label">眼镜矫正</span>
+            <div class="segmented-grid three" id="glassesButtons">
+              <button class="small-button active" data-glasses-mode="none">无</button>
+              <button class="small-button" data-glasses-mode="concave">凹透镜</button>
+              <button class="small-button" data-glasses-mode="convex">凸透镜</button>
+            </div>
+          </div>
+          <input class="file-input" id="retinaImageUpload" type="file" accept="image/*" />
+          <div class="upload-row">
+            <label class="upload-button" for="retinaImageUpload">导入观察图片</label>
+            <span class="upload-name" id="uploadName">未导入，显示教学示例图</span>
+          </div>
+        </div>
+        <section class="retina-observer" aria-labelledby="retinaObserverTitle">
+          <div class="observer-head">
+            <strong id="retinaObserverTitle">视网膜成像观察窗</strong>
+            <span class="clarity-badge" id="retinaBlurStatus">清晰</span>
+          </div>
+          <canvas class="retina-preview" id="retinaPreviewCanvas" width="400" height="150"></canvas>
+          <div class="observer-foot">
+            <span id="focusStatus">焦点落在视网膜上</span>
+            <span class="correction-hint" id="correctionHint">当前无需矫正</span>
+          </div>
+        </section>
+      </section>
+      <section class="detail" id="detail">
+        <div class="detail-name"><span class="swatch" id="detailSwatch"></span><h3 id="detailName">未选择</h3></div>
+        <p class="en" id="detailEn">Click a structure</p>
+        <p id="detailFunction">选择右侧列表或直接点击模型结构。</p>
+        <div class="meta-row"><strong>分类</strong><span id="detailCategory">-</span></div>
+        <div class="meta-row"><strong>科学说明</strong><span id="detailNote">-</span></div>
+        <div class="detail-actions">
+          <button class="small-button" id="focusSelected">定位</button>
+          <button class="small-button" id="isolateSelected">单独查看</button>
+          <button class="small-button" id="relatedSelected">相关结构</button>
+        </div>
+      </section>
+      <div class="list" id="structureList"></div>
+      <div class="footer">
+        <button id="showAll">全部显示</button>
+        <button id="restoreColor">恢复原色</button>
+        <button id="resetAll" class="primary">重置全部</button>
+      </div>
+    </aside>
+  </div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+    const canvas = document.querySelector("#scene");
+    const stage = document.querySelector("#stage");
+    const labelsLayer = document.querySelector("#labels");
+    const tooltip = document.querySelector("#tooltip");
+    const loading = document.querySelector("#loading");
+    const statusText = document.querySelector("#statusText");
+    const structureList = document.querySelector("#structureList");
+    const detailSwatch = document.querySelector("#detailSwatch");
+    const detailName = document.querySelector("#detailName");
+    const detailEn = document.querySelector("#detailEn");
+    const detailFunction = document.querySelector("#detailFunction");
+    const detailCategory = document.querySelector("#detailCategory");
+    const detailNote = document.querySelector("#detailNote");
+    const viewBanner = document.querySelector("#viewBanner");
+    const searchInput = document.querySelector("#searchInput");
+    const presetGrid = document.querySelector("#presetGrid");
+    const groupGrid = document.querySelector("#groupGrid");
+    const accommodationSlider = document.querySelector("#accommodationSlider");
+    const distanceSlider = document.querySelector("#distanceSlider");
+    const accommodationValue = document.querySelector("#accommodationValue");
+    const distanceValue = document.querySelector("#distanceValue");
+    const eyeModeButtons = document.querySelector("#eyeModeButtons");
+    const glassesButtons = document.querySelector("#glassesButtons");
+    const retinaImageUpload = document.querySelector("#retinaImageUpload");
+    const focusStatus = document.querySelector("#focusStatus");
+    const retinaBlurStatus = document.querySelector("#retinaBlurStatus");
+    const retinaPreviewCanvas = document.querySelector("#retinaPreviewCanvas");
+    const correctionHint = document.querySelector("#correctionHint");
+    const uploadName = document.querySelector("#uploadName");
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.72;
+
+    const scene = new THREE.Scene();
+    scene.background = null;
+
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    const defaultCamera = {
+      position: new THREE.Vector3(15.0, -16.0, 10.0),
+      target: new THREE.Vector3(0, 0, 0)
+    };
+    camera.position.copy(defaultCamera.position);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.target.copy(defaultCamera.target);
+    controls.minDistance = 3.2;
+    controls.maxDistance = 42;
+    controls.enablePan = true;
+    controls.enableZoom = true;
+    controls.screenSpacePanning = true;
+    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+    controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+    controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+    controls.touches.ONE = THREE.TOUCH.ROTATE;
+    controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x253044, 1.25));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
+    keyLight.position.set(3.5, -5.8, 4.2);
+    scene.add(keyLight);
+    const rimLight = new THREE.DirectionalLight(0x8fc8ff, 0.8);
+    rimLight.position.set(-4.2, 2.2, 3.0);
+    scene.add(rimLight);
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const structureById = new Map();
+    const objectsByStructure = new Map();
+    const hiddenStructures = new Set();
+    const labelElements = new Map();
+    const originalMaterials = new Map();
+    const fadedStructures = new Set();
+    const transformBaselines = new Map();
+    let opticsGroup = null;
+    let objectImageMesh = null;
+    let retinalImageMesh = null;
+    let focusMarkerMesh = null;
+    let glassesMesh = null;
+    let visualFieldGroup = null;
+    let objectCanvas = null;
+    let objectTexture = null;
+    let retinalCanvas = null;
+    let retinalTexture = null;
+    let uploadedImage = null;
+
+    const occludingStructures = new Set(["sclera", "choroid", "retina", "iris", "ciliary_body", "optic_nerve"]);
+    const transparentByNature = new Set(["cornea", "aqueous_humor", "lens", "vitreous_body"]);
+    const nonFadedTeachingAids = new Set(["light_path", "retinal_blood_vessels", "macula_fovea", "optic_disc"]);
+
+    const groups = [
+      { id: "outer", name: "外层保护", ids: ["sclera", "cornea"] },
+      { id: "refractive", name: "折光介质", ids: ["cornea", "aqueous_humor", "lens", "vitreous_body"] },
+      { id: "neural", name: "感光神经", ids: ["retina", "macula_fovea", "optic_disc", "optic_nerve"] },
+      { id: "vascular", name: "血管营养", ids: ["choroid", "retinal_blood_vessels", "ciliary_body"] },
+      { id: "adjust", name: "调节结构", ids: ["iris", "pupil", "ciliary_body", "zonular_fibers", "lens"] },
+      { id: "teaching", name: "教学辅助", ids: ["light_path"] }
+    ];
+
+    const contextMap = {
+      lens: ["cornea", "aqueous_humor", "iris", "pupil", "ciliary_body", "zonular_fibers", "vitreous_body", "light_path"],
+      retina: ["choroid", "retinal_blood_vessels", "macula_fovea", "optic_disc", "optic_nerve", "vitreous_body"],
+      macula_fovea: ["retina", "retinal_blood_vessels", "optic_disc"],
+      optic_disc: ["retina", "optic_nerve", "retinal_blood_vessels"],
+      optic_nerve: ["optic_disc", "retina", "choroid"],
+      sclera: ["cornea", "choroid", "retina"],
+      cornea: ["aqueous_humor", "iris", "pupil", "lens", "light_path"],
+      iris: ["cornea", "aqueous_humor", "pupil", "lens", "ciliary_body"],
+      ciliary_body: ["lens", "zonular_fibers", "iris"],
+      zonular_fibers: ["lens", "ciliary_body"],
+      light_path: ["cornea", "pupil", "lens", "vitreous_body", "retina"],
+      retinal_blood_vessels: ["retina", "optic_disc", "macula_fovea"],
+      choroid: ["sclera", "retina", "retinal_blood_vessels"],
+      vitreous_body: ["lens", "retina", "light_path"],
+      aqueous_humor: ["cornea", "iris", "lens"]
+    };
+
+    const presets = [
+      {
+        id: "overview",
+        name: "整体剖面",
+        note: "保持真实原色，点击结构可查看说明。",
+        select: "lens",
+        frame: "overview",
+        optics: false,
+        opticsState: { accommodation: 0.30, objectDistance: 0.70, eyeMode: "normal", glassesMode: "none" },
+        labels: false
+      },
+      {
+        id: "light",
+        name: "看光路",
+        note: "突出角膜、瞳孔、晶状体、玻璃体和视网膜成像路径。",
+        select: "light_path",
+        frame: "optics",
+        optics: true,
+        opticsState: { accommodation: 0.30, objectDistance: 0.70, eyeMode: "normal", glassesMode: "none" },
+        visible: ["cornea", "aqueous_humor", "iris", "pupil", "lens", "vitreous_body", "retina", "light_path"],
+        fade: ["sclera", "choroid"],
+        labels: false
+      },
+      {
+        id: "imaging",
+        name: "看成像",
+        note: "观察动态光线聚焦位置和视网膜上的倒像清晰度。",
+        select: "retina",
+        frame: "optics",
+        optics: true,
+        opticsState: { accommodation: 0.30, objectDistance: 0.70, eyeMode: "normal", glassesMode: "none" },
+        visible: ["cornea", "aqueous_humor", "iris", "pupil", "lens", "vitreous_body", "retina", "light_path"],
+        fade: ["sclera", "choroid", "vitreous_body"],
+        labels: false
+      },
+      {
+        id: "accommodation",
+        name: "看调节",
+        note: "突出晶状体、睫状体、悬韧带、虹膜和瞳孔。",
+        select: "lens",
+        frame: "accommodation",
+        optics: true,
+        opticsState: { accommodation: 0.65, objectDistance: 0.35, eyeMode: "normal", glassesMode: "none" },
+        visible: ["cornea", "aqueous_humor", "iris", "pupil", "lens", "ciliary_body", "zonular_fibers", "vitreous_body"],
+        fade: ["cornea", "vitreous_body"],
+        labels: true
+      },
+      {
+        id: "correction",
+        name: "看矫正",
+        note: "配合近视/远视和眼镜按钮，观察焦点回到视网膜的过程。",
+        select: "lens",
+        frame: "optics",
+        optics: true,
+        opticsState: { accommodation: 0.30, objectDistance: 0.70, eyeMode: "myopia", glassesMode: "none" },
+        visible: ["cornea", "iris", "pupil", "lens", "vitreous_body", "retina", "light_path"],
+        fade: ["sclera", "choroid"],
+        labels: false
+      },
+      {
+        id: "retina",
+        name: "看视网膜",
+        note: "突出视网膜、血管、黄斑和视盘，弱化玻璃体遮挡。",
+        select: "retina",
+        frame: "retina",
+        optics: false,
+        visible: ["retina", "choroid", "vitreous_body", "retinal_blood_vessels", "macula_fovea", "optic_disc", "optic_nerve", "light_path"],
+        fade: ["vitreous_body", "choroid"],
+        labels: true
+      },
+      {
+        id: "optic",
+        name: "看视神经",
+        note: "突出视盘、视神经和眼球后壁结构。",
+        select: "optic_nerve",
+        frame: "optic",
+        optics: false,
+        visible: ["sclera", "choroid", "retina", "optic_disc", "optic_nerve", "retinal_blood_vessels"],
+        fade: ["sclera", "choroid"],
+        labels: true
+      },
+      {
+        id: "classroom",
+        name: "课堂简洁",
+        note: "保留初中核心结构，隐藏微结构和部分细节。",
+        select: "sclera",
+        frame: "overview",
+        optics: false,
+        visible: ["sclera", "cornea", "iris", "pupil", "lens", "vitreous_body", "retina", "optic_nerve", "light_path"],
+        labels: true
+      }
+    ];
+
+    const presetFrames = {
+      overview: {
+        targetLocal: [0, 0.10, 0],
+        direction: [0.52, -0.82, 0.24],
+        distance: 10.6
+      },
+      optics: {
+        targetLocal: [0, 0.12, 0.85],
+        direction: [0.48, -0.86, 0.18],
+        distance: 9.9
+      },
+      accommodation: {
+        targetLocal: [0, 0.06, 1.05],
+        direction: [0.52, -0.84, 0.16],
+        distance: 7.4
+      },
+      retina: {
+        targetLocal: [0, 0.08, -1.55],
+        direction: [0.62, -0.70, 0.34],
+        distance: 7.6
+      },
+      optic: {
+        targetLocal: [0, 0.10, -2.25],
+        direction: [0.68, -0.58, 0.45],
+        distance: 8.2
+      }
+    };
+
+    let root = null;
+    let selectedId = null;
+    let hoverId = null;
+    let autoRotate = false;
+    let labelsVisible = false;
+    let answerHidden = false;
+    let xrayMode = false;
+    let fadeOthers = false;
+    let isolated = false;
+    let activeGroupId = null;
+    let activePresetId = "overview";
+    let focusTween = null;
+    const clock = new THREE.Clock();
+    const opticsState = {
+      accommodation: 0.30,
+      objectDistance: 0.70,
+      eyeMode: "normal",
+      glassesMode: "none",
+      focusError: 0,
+      blurPx: 0
+    };
+    const retinaY = 2.045;
+    const objectBaseY = -3.62;
+    const objectTravel = 1.14;
+    const glassesY = -3.03;
+
+    function eyePoint(x, axialY, verticalZ = 0) {
+      return new THREE.Vector3(x, verticalZ, -axialY);
+    }
+
+    function getCameraPose(frameId = "overview") {
+      const frame = presetFrames[frameId] || presetFrames.overview;
+      if (!root) {
+        return {
+          position: defaultCamera.position.clone(),
+          target: defaultCamera.target.clone()
+        };
+      }
+      root.updateMatrixWorld(true);
+      const target = root.localToWorld(new THREE.Vector3(...frame.targetLocal));
+      const direction = new THREE.Vector3(...frame.direction).normalize();
+      const modelScale = Math.max(0.72, root.scale.x / 0.74);
+      const narrowFactor = camera.aspect < 1.08 ? 1.28 : 1;
+      const distance = frame.distance * modelScale * narrowFactor;
+      return {
+        position: target.clone().add(direction.multiplyScalar(distance)),
+        target
+      };
+    }
+
+    function resetCameraForActiveView() {
+      const preset = presets.find((item) => item.id === activePresetId);
+      const pose = getCameraPose(preset?.frame || "overview");
+      moveCamera(pose.position, pose.target);
+    }
+
+    const data = await fetch("./eye-structures.json").then((res) => {
+      if (!res.ok) throw new Error("eye-structures.json " + res.status);
+      return res.json();
+    });
+    data.structures.forEach((item) => structureById.set(item.id, item));
+
+    renderPresets();
+    renderGroups();
+    renderStructureList();
+
+    const loader = new GLTFLoader();
+    loader.load(
+      "./structured_eye_model.glb",
+      (gltf) => {
+        root = gltf.scene;
+        scene.add(root);
+        root.traverse((obj) => {
+          const sid = obj.userData?.structure_id || structureIdFromName(obj.name);
+          if (!sid || !structureById.has(sid)) return;
+          obj.userData.structure_id = sid;
+          if (!objectsByStructure.has(sid)) objectsByStructure.set(sid, []);
+          objectsByStructure.get(sid).push(obj);
+
+          if (obj.isMesh) {
+            obj.material = Array.isArray(obj.material) ? obj.material.map((m) => m.clone()) : obj.material.clone();
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            mats.forEach((mat) => {
+              mat.side = THREE.DoubleSide;
+              mat.needsUpdate = true;
+            });
+            originalMaterials.set(obj.uuid, mats.map((mat) => ({
+              color: mat.color ? mat.color.clone() : null,
+              emissive: mat.emissive ? mat.emissive.clone() : null,
+              emissiveIntensity: mat.emissiveIntensity || 0,
+              opacity: mat.opacity,
+              transparent: mat.transparent,
+              depthWrite: mat.depthWrite
+            })));
+          }
+        });
+
+        const bodyBox = new THREE.Box3();
+        root.traverse((obj) => {
+          if (obj.userData?.structure_id && obj.userData.structure_id !== "light_path") {
+            bodyBox.expandByObject(obj);
+          }
+        });
+        const center = bodyBox.isEmpty()
+          ? new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3())
+          : bodyBox.getCenter(new THREE.Vector3());
+        const compactViewport = window.matchMedia("(max-width: 980px)").matches;
+        root.position.sub(center);
+        root.position.x += compactViewport ? 0 : 6.6;
+        root.position.z += compactViewport ? 2.2 : 6.0;
+        root.position.y += 3.0;
+        root.scale.setScalar(compactViewport ? 0.88 : 0.74);
+        root.updateMatrixWorld(true);
+
+        const homePose = getCameraPose("overview");
+        defaultCamera.position.copy(homePose.position);
+        defaultCamera.target.copy(homePose.target);
+        camera.position.copy(homePose.position);
+        controls.target.copy(homePose.target);
+
+        setupOpticsOverlay();
+        applyPreset(new URLSearchParams(window.location.search).get("preset") || "overview", { keepSelection: false });
+        applyInitialOpticsFromQuery();
+        applyOpticsState();
+        loading.style.display = "none";
+        statusText.textContent = `${structureById.size} 类结构，${countClickableMeshes()} 个可拾取对象`;
+      },
+      undefined,
+      (error) => {
+        loading.textContent = "模型加载失败";
+        statusText.textContent = error.message || "GLB 加载失败";
+      }
+    );
+
+    function structureIdFromName(name) {
+      for (const item of data.structures) {
+        if (item.object_names?.includes(name)) return item.id;
+      }
+      return null;
+    }
+
+    function countClickableMeshes() {
+      let count = 0;
+      root?.traverse((obj) => {
+        if (obj.isMesh && obj.userData.structure_id) count += 1;
+      });
+      return count;
+    }
+
+    function setupOpticsOverlay() {
+      if (!root) return;
+      transformBaselines.clear();
+      ["lens", "ciliary_body", "zonular_fibers"].forEach((sid) => {
+        (objectsByStructure.get(sid) || []).forEach((obj) => {
+          transformBaselines.set(obj.uuid, {
+            scale: obj.scale.clone(),
+            materialOpacity: getMaterialList(obj).map((mat) => mat.opacity)
+          });
+        });
+      });
+
+      opticsGroup = new THREE.Group();
+      opticsGroup.name = "interactive_optics_overlay_v312";
+      root.add(opticsGroup);
+
+      objectCanvas = document.createElement("canvas");
+      objectCanvas.width = 320;
+      objectCanvas.height = 220;
+      objectTexture = new THREE.CanvasTexture(objectCanvas);
+      objectTexture.colorSpace = THREE.SRGBColorSpace;
+      const objectMaterial = new THREE.SpriteMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.92,
+        depthWrite: false,
+        depthTest: false
+      });
+      objectMaterial.map = objectTexture;
+      objectImageMesh = new THREE.Sprite(objectMaterial);
+      objectImageMesh.name = "interactive_front_object_image_plane";
+      objectImageMesh.renderOrder = 30;
+      opticsGroup.add(objectImageMesh);
+
+      visualFieldGroup = createVisualFieldFrame();
+      opticsGroup.add(visualFieldGroup);
+
+      const imageMaterial = new THREE.SpriteMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.90,
+        depthWrite: false,
+        depthTest: false
+      });
+      retinalImageMesh = new THREE.Sprite(imageMaterial);
+      retinalImageMesh.name = "interactive_retinal_inverted_image";
+      retinalImageMesh.position.copy(eyePoint(0, retinaY, -0.03));
+      retinalImageMesh.scale.set(0.96, 0.60, 1);
+      retinalImageMesh.renderOrder = 31;
+      opticsGroup.add(retinalImageMesh);
+
+      const focusMaterial = new THREE.MeshStandardMaterial({
+        color: 0xfff0a6,
+        emissive: 0xffdd55,
+        emissiveIntensity: 0.65,
+        roughness: 0.24
+      });
+      focusMarkerMesh = new THREE.Mesh(new THREE.SphereGeometry(0.045, 24, 12), focusMaterial);
+      focusMarkerMesh.name = "interactive_focus_marker";
+      opticsGroup.add(focusMarkerMesh);
+
+      retinalCanvas = document.createElement("canvas");
+      retinalCanvas.width = 256;
+      retinalCanvas.height = 160;
+      retinalTexture = new THREE.CanvasTexture(retinalCanvas);
+      retinalTexture.colorSpace = THREE.SRGBColorSpace;
+      retinalImageMesh.material.map = retinalTexture;
+      retinalImageMesh.material.needsUpdate = true;
+      drawObjectImage();
+      drawRetinalImage();
+    }
+
+    function createVisualFieldFrame() {
+      const group = new THREE.Group();
+      group.name = "interactive_visual_field_frame";
+      const frameMaterial = new THREE.LineBasicMaterial({
+        color: 0xff4e4e,
+        transparent: true,
+        opacity: 0.78,
+        depthTest: false,
+        depthWrite: false
+      });
+      const w = 1.42;
+      const h = 0.96;
+      const plane = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({
+          color: 0xff4e4e,
+          transparent: true,
+          opacity: 0.06,
+          side: THREE.DoubleSide,
+          depthTest: false,
+          depthWrite: false
+        })
+      );
+      plane.name = "interactive_visual_field_translucent_plane";
+      plane.renderOrder = 31;
+      group.add(plane);
+      const pts = [
+        new THREE.Vector3(-w / 2, -h / 2, 0),
+        new THREE.Vector3(w / 2, -h / 2, 0),
+        new THREE.Vector3(w / 2, h / 2, 0),
+        new THREE.Vector3(-w / 2, h / 2, 0),
+        new THREE.Vector3(-w / 2, -h / 2, 0)
+      ];
+      const frame = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), frameMaterial);
+      frame.name = "interactive_visual_field_frame_outline";
+      frame.renderOrder = 32;
+      group.add(frame);
+
+      const axisMaterial = new THREE.LineBasicMaterial({
+        color: 0xffd96b,
+        transparent: true,
+        opacity: 0.58,
+        depthTest: false,
+        depthWrite: false
+      });
+      const horizontal = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-w / 2, 0, 0),
+        new THREE.Vector3(w / 2, 0, 0)
+      ]), axisMaterial);
+      horizontal.name = "interactive_visual_field_horizontal_axis";
+      horizontal.renderOrder = 33;
+      const vertical = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, -h / 2, 0),
+        new THREE.Vector3(0, h / 2, 0)
+      ]), axisMaterial);
+      vertical.name = "interactive_visual_field_vertical_axis";
+      vertical.renderOrder = 33;
+      const label = createTextSprite("视野框", "#ff4e4e", "rgba(20, 8, 8, 0.64)");
+      label.name = "interactive_visual_field_label";
+      label.position.set(0, h / 2 + 0.16, 0.02);
+      label.scale.set(0.62, 0.18, 1);
+      label.renderOrder = 36;
+      group.add(horizontal, vertical, label);
+      return group;
+    }
+
+    function createTextSprite(text, color, background) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 80;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = background;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      roundRect(ctx, 18, 14, 220, 52, 18);
+      ctx.fill();
+      ctx.stroke();
+      ctx.font = "bold 28px Microsoft YaHei, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = color;
+      ctx.fillText(text, 128, 40);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      });
+      return new THREE.Sprite(material);
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function createLensGeometry(mode) {
+      const points = mode === "concave"
+        ? [
+            new THREE.Vector2(0.04, -0.026),
+            new THREE.Vector2(0.34, -0.054),
+            new THREE.Vector2(0.78, -0.150),
+            new THREE.Vector2(0.84, -0.118),
+            new THREE.Vector2(0.84, 0.118),
+            new THREE.Vector2(0.78, 0.150),
+            new THREE.Vector2(0.34, 0.054),
+            new THREE.Vector2(0.04, 0.026)
+          ]
+        : [
+            new THREE.Vector2(0.04, -0.150),
+            new THREE.Vector2(0.34, -0.116),
+            new THREE.Vector2(0.78, -0.036),
+            new THREE.Vector2(0.84, -0.026),
+            new THREE.Vector2(0.84, 0.026),
+            new THREE.Vector2(0.78, 0.036),
+            new THREE.Vector2(0.34, 0.116),
+            new THREE.Vector2(0.04, 0.150)
+          ];
+      return new THREE.LatheGeometry(points, 96);
+    }
+
+    function createModeledGlassesLens(mode) {
+      const group = new THREE.Group();
+      group.name = `interactive_modeled_${mode}_glasses_lens`;
+      group.position.copy(eyePoint(0, glassesY, 0));
+
+      const glassMaterial = new THREE.MeshPhysicalMaterial({
+        color: mode === "concave" ? 0x9bdcff : 0xbff6ff,
+        transparent: true,
+        opacity: 0.46,
+        roughness: 0.06,
+        metalness: 0,
+        transmission: 0.42,
+        thickness: mode === "concave" ? 0.28 : 0.34,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const lensBody = new THREE.Mesh(createLensGeometry(mode), glassMaterial);
+      lensBody.name = `interactive_${mode}_lens_body`;
+      lensBody.rotation.x = Math.PI / 2;
+      group.add(lensBody);
+
+      const rimMaterial = new THREE.MeshBasicMaterial({
+        color: mode === "concave" ? 0x4fb5ff : 0x66f0ff,
+        transparent: true,
+        opacity: 0.86,
+        depthWrite: false
+      });
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.84, 0.012, 10, 112), rimMaterial);
+      rim.name = `interactive_${mode}_lens_rim`;
+      group.add(rim);
+
+      const profileMaterial = new THREE.LineBasicMaterial({
+        color: mode === "concave" ? 0x5bbcff : 0xb8ffff,
+        transparent: true,
+        opacity: 0.80,
+        depthWrite: false
+      });
+      const sideProfile = mode === "concave"
+        ? [new THREE.Vector3(-0.86, 0, -0.15), new THREE.Vector3(-0.34, 0, -0.05), new THREE.Vector3(0, 0, -0.02), new THREE.Vector3(0.34, 0, -0.05), new THREE.Vector3(0.86, 0, -0.15)]
+        : [new THREE.Vector3(-0.86, 0, -0.03), new THREE.Vector3(-0.34, 0, -0.10), new THREE.Vector3(0, 0, -0.15), new THREE.Vector3(0.34, 0, -0.10), new THREE.Vector3(0.86, 0, -0.03)];
+      const frontProfile = new THREE.Line(new THREE.BufferGeometry().setFromPoints(sideProfile), profileMaterial);
+      frontProfile.name = `interactive_${mode}_lens_front_profile`;
+      group.add(frontProfile);
+      const backProfile = frontProfile.clone();
+      backProfile.name = `interactive_${mode}_lens_back_profile`;
+      backProfile.rotation.y = Math.PI;
+      group.add(backProfile);
+      return group;
+    }
+
+    function getMaterialList(obj) {
+      if (!obj.material) return [];
+      return Array.isArray(obj.material) ? obj.material : [obj.material];
+    }
+
+    function applyOpticsState() {
+      if (!root) return;
+      const requiredAccommodation = 1 - opticsState.objectDistance;
+      const eyeOffset = { normal: 0, myopia: 0.34, hyperopia: -0.34 }[opticsState.eyeMode] || 0;
+      const glassesPower = { none: 0, concave: -0.34, convex: 0.34 }[opticsState.glassesMode] || 0;
+      opticsState.focusError = opticsState.accommodation + eyeOffset + glassesPower - requiredAccommodation;
+      opticsState.blurPx = Math.min(14, Math.abs(opticsState.focusError) * 28);
+
+      applyLensAndCiliaryTransform();
+      updateDynamicRays();
+      updateRetinalImage();
+      updateOpticsPanel();
+    }
+
+    function applyManualOpticsChange() {
+      if (opticsGroup) opticsGroup.visible = true;
+      applyOpticsState();
+      viewBanner.innerHTML = "<strong>成像实验</strong>：调节物距、睫状体和眼镜，观察焦点位置及视网膜像的清晰度。";
+    }
+
+    function applyLensAndCiliaryTransform() {
+      const a = opticsState.accommodation;
+      (objectsByStructure.get("lens") || []).forEach((obj) => {
+        const base = transformBaselines.get(obj.uuid)?.scale || obj.scale;
+        obj.scale.set(base.x * (1.07 - 0.12 * a), base.y * (0.86 + 0.34 * a), base.z * (1.07 - 0.12 * a));
+      });
+      (objectsByStructure.get("ciliary_body") || []).forEach((obj) => {
+        const base = transformBaselines.get(obj.uuid)?.scale || obj.scale;
+        obj.scale.set(base.x * (1.02 - 0.07 * a), base.y, base.z * (1.02 - 0.07 * a));
+      });
+      (objectsByStructure.get("zonular_fibers") || []).forEach((obj) => {
+        const mats = getMaterialList(obj);
+        const base = transformBaselines.get(obj.uuid);
+        mats.forEach((mat, index) => {
+          mat.transparent = true;
+          mat.opacity = THREE.MathUtils.clamp((base?.materialOpacity?.[index] ?? mat.opacity ?? 1) * (1.04 - 0.38 * a), 0.42, 1);
+          mat.needsUpdate = true;
+        });
+      });
+    }
+
+    function updateDynamicRays() {
+      if (!opticsGroup) return;
+      [...opticsGroup.children]
+        .filter((child) => child.name.startsWith("interactive_ray_"))
+        .forEach((child) => {
+          child.geometry.dispose();
+          child.material.dispose();
+          opticsGroup.remove(child);
+        });
+
+      const focusY = THREE.MathUtils.clamp(retinaY - opticsState.focusError * 1.08, 1.18, 2.92);
+      const objectY = objectBaseY - objectTravel * opticsState.objectDistance;
+      const objectScale = THREE.MathUtils.lerp(1.14, 0.72, opticsState.objectDistance);
+      if (objectImageMesh) {
+        objectImageMesh.position.copy(eyePoint(0, objectY, 0.46));
+        objectImageMesh.scale.set(1.12 * objectScale, 0.74 * objectScale, 1);
+      }
+      if (visualFieldGroup) {
+        visualFieldGroup.position.copy(eyePoint(0, objectY, 0.46));
+        visualFieldGroup.scale.setScalar(objectScale * 1.18);
+      }
+
+      const objectTop = eyePoint(-0.32 * objectScale, objectY, 0.76 * objectScale);
+      const objectCenter = eyePoint(0, objectY, 0.46 * objectScale);
+      const objectBottom = eyePoint(0.32 * objectScale, objectY, 0.18 * objectScale);
+      const focusTop = eyePoint(0.04, focusY, -0.21);
+      const focusCenter = eyePoint(0, focusY, 0);
+      const focusBottom = eyePoint(-0.04, focusY, 0.21);
+      const spectacleDeflection = { none: 0, concave: 0.14, convex: -0.14 }[opticsState.glassesMode] || 0;
+      const raySets = [
+        [
+          objectTop,
+          eyePoint(-0.36 - spectacleDeflection * 0.55, glassesY, 0.42 + spectacleDeflection * 0.70),
+          eyePoint(-0.42 - spectacleDeflection, -2.42, 0.34 + spectacleDeflection * 0.70),
+          eyePoint(-0.18 - spectacleDeflection * 0.34, -1.34, 0.12 + spectacleDeflection * 0.26),
+          focusTop
+        ],
+        [
+          objectCenter,
+          eyePoint(0, glassesY, 0.14),
+          eyePoint(0, -2.42, 0.08),
+          eyePoint(0, -1.34, 0.02),
+          focusCenter
+        ],
+        [
+          objectBottom,
+          eyePoint(0.36 + spectacleDeflection * 0.55, glassesY, -0.20 - spectacleDeflection * 0.70),
+          eyePoint(0.42 + spectacleDeflection, -2.42, -0.18 - spectacleDeflection * 0.70),
+          eyePoint(0.18 + spectacleDeflection * 0.34, -1.34, -0.08 - spectacleDeflection * 0.26),
+          focusBottom
+        ]
+      ];
+
+      raySets.forEach((points, index) => {
+        const path = new THREE.CurvePath();
+        for (let i = 0; i < points.length - 1; i += 1) {
+          path.add(new THREE.LineCurve3(points[i], points[i + 1]));
+        }
+        const geometry = new THREE.TubeGeometry(path, 52, 0.012, 8, false);
+        const material = new THREE.MeshBasicMaterial({
+          color: index === 1 ? 0xfff2a3 : 0xffe26b,
+          transparent: true,
+          opacity: 0.88
+        });
+        const ray = new THREE.Mesh(geometry, material);
+        ray.name = `interactive_ray_${index + 1}`;
+        opticsGroup.add(ray);
+      });
+
+      if (focusMarkerMesh) {
+        focusMarkerMesh.position.copy(eyePoint(0, focusY, 0));
+        const onRetina = Math.abs(opticsState.focusError) < 0.055;
+        focusMarkerMesh.material.color.set(onRetina ? 0x35d98a : 0xffe178);
+        focusMarkerMesh.material.emissive.set(onRetina ? 0x18b970 : 0xffb020);
+        focusMarkerMesh.material.needsUpdate = true;
+      }
+      if (glassesMesh) {
+        opticsGroup.remove(glassesMesh);
+        glassesMesh.traverse((obj) => {
+          obj.geometry?.dispose?.();
+          if (Array.isArray(obj.material)) obj.material.forEach((mat) => mat.dispose?.());
+          else obj.material?.dispose?.();
+        });
+        glassesMesh = null;
+      }
+      if (opticsState.glassesMode !== "none") {
+        glassesMesh = createModeledGlassesLens(opticsState.glassesMode);
+        opticsGroup.add(glassesMesh);
+      }
+    }
+
+    function drawObjectImage() {
+      if (!objectCanvas) return;
+      const ctx = objectCanvas.getContext("2d");
+      const w = objectCanvas.width;
+      const h = objectCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      ctx.fillStyle = "rgba(8, 16, 28, 0.18)";
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = "rgba(255, 78, 78, 0.92)";
+      ctx.lineWidth = 6;
+      ctx.strokeRect(10, 10, w - 20, h - 20);
+      ctx.setLineDash([10, 8]);
+      ctx.strokeStyle = "rgba(255, 226, 107, 0.58)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 14);
+      ctx.lineTo(w / 2, h - 14);
+      ctx.moveTo(14, h / 2);
+      ctx.lineTo(w - 14, h / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (uploadedImage) {
+        const ratio = Math.min((w - 44) / uploadedImage.width, (h - 44) / uploadedImage.height);
+        const iw = uploadedImage.width * ratio;
+        const ih = uploadedImage.height * ratio;
+        ctx.drawImage(uploadedImage, (w - iw) / 2, (h - ih) / 2, iw, ih);
+      } else {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(90, 52, 54, 112);
+        ctx.fillStyle = "#ec4e4e";
+        ctx.beginPath();
+        ctx.moveTo(117, 28);
+        ctx.lineTo(67, 78);
+        ctx.lineTo(167, 78);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#2f80ed";
+        ctx.fillRect(176, 78, 66, 88);
+        ctx.fillStyle = "#35b66f";
+        ctx.beginPath();
+        ctx.arc(220, 52, 25, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      if (objectTexture) objectTexture.needsUpdate = true;
+    }
+
+    function drawRetinalImage() {
+      if (!retinalCanvas) return;
+      const ctx = retinalCanvas.getContext("2d");
+      const w = retinalCanvas.width;
+      const h = retinalCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(Math.PI);
+      ctx.filter = `blur(${opticsState.blurPx.toFixed(1)}px)`;
+      if (uploadedImage) {
+        const ratio = Math.min(w / uploadedImage.width, h / uploadedImage.height);
+        const iw = uploadedImage.width * ratio;
+        const ih = uploadedImage.height * ratio;
+        ctx.drawImage(uploadedImage, -iw / 2, -ih / 2, iw, ih);
+      } else {
+        ctx.fillStyle = "#f7fbff";
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+        ctx.fillStyle = "#e44c4c";
+        ctx.beginPath();
+        ctx.moveTo(-62, 34);
+        ctx.lineTo(0, -44);
+        ctx.lineTo(62, 34);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#2f80ed";
+        ctx.fillRect(-70, 38, 140, 18);
+        ctx.fillStyle = "#32b36a";
+        ctx.beginPath();
+        ctx.arc(46, -34, 18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      if (retinalTexture) retinalTexture.needsUpdate = true;
+    }
+
+    function drawRetinaPreview() {
+      if (!retinaPreviewCanvas) return;
+      const ctx = retinaPreviewCanvas.getContext("2d");
+      const w = retinaPreviewCanvas.width;
+      const h = retinaPreviewCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const background = ctx.createLinearGradient(0, 0, w, h);
+      background.addColorStop(0, "#152438");
+      background.addColorStop(1, "#070d16");
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.save();
+      roundRect(ctx, 18, 12, w - 36, h - 24, 12);
+      ctx.clip();
+      ctx.fillStyle = "#eef4f8";
+      ctx.fillRect(18, 12, w - 36, h - 24);
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(Math.PI);
+      ctx.filter = `blur(${opticsState.blurPx.toFixed(1)}px)`;
+      if (uploadedImage) {
+        const ratio = Math.min((w - 58) / uploadedImage.width, (h - 38) / uploadedImage.height);
+        const iw = uploadedImage.width * ratio;
+        const ih = uploadedImage.height * ratio;
+        ctx.drawImage(uploadedImage, -iw / 2, -ih / 2, iw, ih);
+      } else {
+        ctx.fillStyle = "#f7fbff";
+        ctx.fillRect(-(w - 36) / 2, -(h - 24) / 2, w - 36, h - 24);
+        ctx.fillStyle = "#e44c4c";
+        ctx.beginPath();
+        ctx.moveTo(-70, 34);
+        ctx.lineTo(0, -44);
+        ctx.lineTo(70, 34);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#2f80ed";
+        ctx.fillRect(-80, 40, 160, 20);
+        ctx.fillStyle = "#32b36a";
+        ctx.beginPath();
+        ctx.arc(58, -34, 20, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      const vignette = ctx.createRadialGradient(w / 2, h / 2, 24, w / 2, h / 2, w * 0.52);
+      vignette.addColorStop(0, "rgba(87, 32, 24, 0)");
+      vignette.addColorStop(0.72, "rgba(84, 26, 21, 0.08)");
+      vignette.addColorStop(1, "rgba(42, 10, 8, 0.42)");
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = "rgba(255, 178, 126, 0.56)";
+      ctx.lineWidth = 2;
+      roundRect(ctx, 18, 12, w - 36, h - 24, 12);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.14)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 18);
+      ctx.lineTo(w / 2, h - 18);
+      ctx.moveTo(24, h / 2);
+      ctx.lineTo(w - 24, h / 2);
+      ctx.stroke();
+    }
+
+    function updateRetinalImage() {
+      drawObjectImage();
+      drawRetinalImage();
+      drawRetinaPreview();
+      if (retinalImageMesh) {
+        retinalImageMesh.position.copy(eyePoint(0, retinaY, -0.03));
+        retinalImageMesh.material.opacity = 0.92 - Math.min(0.35, opticsState.blurPx / 40);
+        retinalImageMesh.material.needsUpdate = true;
+      }
+    }
+
+    function updateOpticsPanel() {
+      accommodationValue.textContent = `${Math.round(opticsState.accommodation * 100)}%`;
+      const distanceLabel = opticsState.objectDistance > 0.66 ? "远物" : opticsState.objectDistance < 0.34 ? "近物" : "中距离";
+      distanceValue.textContent = distanceLabel;
+      const error = opticsState.focusError;
+      if (Math.abs(error) < 0.055) {
+        focusStatus.textContent = "焦点落在视网膜上";
+      } else if (error > 0) {
+        focusStatus.textContent = "焦点落在视网膜前";
+      } else {
+        focusStatus.textContent = "焦点落在视网膜后";
+      }
+      const clarity = opticsState.blurPx < 1.8 ? "清晰" : opticsState.blurPx < 6 ? "轻度模糊" : "明显模糊";
+      retinaBlurStatus.textContent = clarity;
+      retinaBlurStatus.classList.toggle("blur", opticsState.blurPx >= 1.8);
+      if (opticsState.eyeMode === "myopia") {
+        correctionHint.textContent = opticsState.glassesMode === "concave"
+          ? (Math.abs(error) < 0.055 ? "凹透镜矫正成功" : "凹透镜方向正确，继续调节晶状体")
+          : opticsState.glassesMode === "convex" ? "镜片方向错误，应选凹透镜" : "近视应选凹透镜";
+      } else if (opticsState.eyeMode === "hyperopia") {
+        correctionHint.textContent = opticsState.glassesMode === "convex"
+          ? (Math.abs(error) < 0.055 ? "凸透镜矫正成功" : "凸透镜方向正确，继续调节晶状体")
+          : opticsState.glassesMode === "concave" ? "镜片方向错误，应选凸透镜" : "远视应选凸透镜";
+      } else if (opticsState.glassesMode === "none") {
+        correctionHint.textContent = Math.abs(error) < 0.055 ? "当前无需矫正" : "调节晶状体使焦点回到视网膜";
+      } else {
+        correctionHint.textContent = "正常眼无需佩戴矫正镜片";
+      }
+      eyeModeButtons.querySelectorAll("[data-eye-mode]").forEach((btn) => btn.classList.toggle("active", btn.dataset.eyeMode === opticsState.eyeMode));
+      glassesButtons.querySelectorAll("[data-glasses-mode]").forEach((btn) => btn.classList.toggle("active", btn.dataset.glassesMode === opticsState.glassesMode));
+    }
+
+    function handleImageUpload(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          uploadedImage = img;
+          uploadName.textContent = file.name;
+          applyManualOpticsChange();
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function applyInitialOpticsFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const eye = params.get("eye");
+      const glasses = params.get("glasses");
+      if (["normal", "myopia", "hyperopia"].includes(eye)) opticsState.eyeMode = eye;
+      if (["none", "concave", "convex"].includes(glasses)) opticsState.glassesMode = glasses;
+      if (params.has("accommodation")) {
+        const accommodation = Number(params.get("accommodation"));
+        if (Number.isFinite(accommodation)) opticsState.accommodation = THREE.MathUtils.clamp(accommodation / 100, 0, 1);
+      }
+      if (params.has("distance")) {
+        const distance = Number(params.get("distance"));
+        if (Number.isFinite(distance)) opticsState.objectDistance = THREE.MathUtils.clamp(distance / 100, 0, 1);
+      }
+      accommodationSlider.value = String(Math.round(opticsState.accommodation * 100));
+      distanceSlider.value = String(Math.round(opticsState.objectDistance * 100));
+    }
+
+    function renderPresets() {
+      presetGrid.innerHTML = "";
+      presets.forEach((preset) => {
+        const btn = document.createElement("button");
+        btn.className = "small-button";
+        btn.dataset.preset = preset.id;
+        btn.textContent = preset.name;
+        btn.addEventListener("click", () => applyPreset(preset.id));
+        presetGrid.appendChild(btn);
+      });
+    }
+
+    function renderGroups() {
+      groupGrid.innerHTML = "";
+      groups.forEach((group) => {
+        const btn = document.createElement("button");
+        btn.className = "small-button";
+        btn.dataset.group = group.id;
+        btn.textContent = group.name;
+        btn.addEventListener("click", () => toggleGroup(group.id));
+        groupGrid.appendChild(btn);
+      });
+    }
+
+    function renderStructureList() {
+      structureList.innerHTML = "";
+      const query = searchInput.value.trim().toLowerCase();
+      data.structures
+        .filter((item) => {
+          if (!query) return true;
+          return [item.name_zh, item.name_en, item.category, item.function_zh]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(query));
+        })
+        .forEach((item) => {
+          const btn = document.createElement("button");
+          btn.className = "structure-button";
+          btn.dataset.id = item.id;
+          btn.innerHTML = `
+            <span class="swatch" style="background:${item.color}"></span>
+            <span>
+              <span class="name">${item.name_zh}</span>
+              <span class="sub">${item.name_en} · ${item.object_names?.length || 0} 个对象</span>
+            </span>
+            <span class="mini-icon" title="定位" data-focus="${item.id}" aria-label="定位 ${item.name_zh}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4M7.8 7.8l-2.8-2.8M19 19l-2.8-2.8M16.2 7.8 19 5M5 19l2.8-2.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </span>
+            <span class="mini-icon" title="显示/隐藏" data-visibility="${item.id}" aria-label="显示或隐藏 ${item.name_zh}">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="2.8" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </span>
+          `;
+          btn.addEventListener("click", (event) => {
+            const focus = event.target.closest("[data-focus]");
+            const visibility = event.target.closest("[data-visibility]");
+            if (focus) {
+              event.stopPropagation();
+              selectStructure(item.id);
+              focusStructure(item.id);
+              return;
+            }
+            if (visibility) {
+              event.stopPropagation();
+              toggleVisibility(item.id);
+              return;
+            }
+            selectStructure(item.id);
+          });
+          structureList.appendChild(btn);
+
+          if (!labelElements.has(item.id)) {
+            const label = document.createElement("div");
+            label.className = "label";
+            labelElements.set(item.id, label);
+            labelsLayer.appendChild(label);
+          }
+        });
+      updateListState();
+      updateLabels();
+    }
+
+    function selectStructure(id, options = {}) {
+      if (!structureById.has(id)) return;
+      selectedId = id;
+      if (!options.keepIsolation) isolated = false;
+      updateDetail();
+      updateAllState();
+    }
+
+    function updateDetail() {
+      const item = structureById.get(selectedId);
+      if (!item) return;
+      detailSwatch.style.background = item.color;
+      detailName.textContent = answerHidden ? "已隐藏答案" : item.name_zh;
+      detailEn.textContent = answerHidden ? "Answer hidden" : item.name_en;
+      detailFunction.textContent = answerHidden ? "答案隐藏中。老师可以先让学生判断，再点击“隐藏答案”恢复。" : item.function_zh;
+      detailCategory.textContent = answerHidden ? "-" : item.category;
+      detailNote.textContent = answerHidden ? "-" : item.scientific_note;
+    }
+
+    function applyToMaterials(obj, fn) {
+      if (!obj.isMesh || !obj.material) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach(fn);
+    }
+
+    function resetMaterial(mat, original) {
+      if (original?.color && mat.color) mat.color.copy(original.color);
+      if (original?.emissive && mat.emissive) mat.emissive.copy(original.emissive);
+      if (typeof original?.emissiveIntensity === "number") mat.emissiveIntensity = original.emissiveIntensity;
+      if (typeof original?.opacity === "number") mat.opacity = original.opacity;
+      if (typeof original?.transparent === "boolean") mat.transparent = original.transparent;
+      if (typeof original?.depthWrite === "boolean") mat.depthWrite = original.depthWrite;
+    }
+
+    function updateMaterials() {
+      root?.traverse((obj) => {
+        if (!obj.isMesh) return;
+        const sid = obj.userData.structure_id;
+        const saved = originalMaterials.get(obj.uuid);
+        applyToMaterials(obj, (mat, i) => {
+          resetMaterial(mat, saved?.[i]);
+
+          if (xrayMode && occludingStructures.has(sid) && !transparentByNature.has(sid)) {
+            mat.transparent = true;
+            mat.opacity = Math.min(mat.opacity ?? 1, 0.5);
+            mat.depthWrite = false;
+          }
+
+          if (fadedStructures.has(sid)) {
+            mat.transparent = true;
+            mat.opacity = Math.min(mat.opacity ?? 1, 0.28);
+            mat.depthWrite = false;
+          }
+
+          if (fadeOthers && selectedId && sid !== selectedId && !nonFadedTeachingAids.has(sid)) {
+            mat.transparent = true;
+            mat.opacity = Math.min(mat.opacity ?? 1, 0.30);
+            mat.depthWrite = false;
+          }
+
+          if (sid === hoverId && sid !== selectedId) {
+            if (mat.color) mat.color.lerp(new THREE.Color("#3df29b"), 0.12);
+            if (mat.emissive) mat.emissive.set("#1fc77a");
+            mat.emissiveIntensity = 0.18;
+          }
+
+          if (sid === selectedId) {
+            if (mat.color) mat.color.lerp(new THREE.Color("#3df29b"), 0.18);
+            if (mat.emissive) mat.emissive.set("#25e98a");
+            mat.emissiveIntensity = 0.55;
+          }
+
+          mat.needsUpdate = true;
+        });
+      });
+    }
+
+    function toggleVisibility(id) {
+      hiddenStructures.has(id) ? hiddenStructures.delete(id) : hiddenStructures.add(id);
+      isolated = false;
+      updateAllState();
+    }
+
+    function getVisibleSetForPreset(preset) {
+      if (!preset?.visible) return null;
+      return new Set(preset.visible);
+    }
+
+    function updateVisibility() {
+      const preset = presets.find((item) => item.id === activePresetId);
+      const visibleSet = getVisibleSetForPreset(preset);
+      const isolateContext = new Set(contextMap[selectedId] || []);
+      objectsByStructure.forEach((objects, id) => {
+        let visible = !hiddenStructures.has(id);
+        if (visibleSet) visible = visible && visibleSet.has(id);
+        if (isolated) visible = id === selectedId || isolateContext.has(id);
+        objects.forEach((obj) => { obj.visible = visible; });
+      });
+    }
+
+    function updateListState() {
+      document.querySelectorAll(".structure-button").forEach((btn) => {
+        const id = btn.dataset.id;
+        btn.classList.toggle("active", id === selectedId);
+        btn.classList.toggle("hidden", hiddenStructures.has(id));
+      });
+      document.querySelectorAll("[data-visibility]").forEach((btn) => {
+        btn.classList.toggle("off", hiddenStructures.has(btn.dataset.visibility));
+      });
+      document.querySelectorAll("[data-preset]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.preset === activePresetId);
+      });
+      document.querySelectorAll("[data-group]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.group === activeGroupId);
+      });
+      document.querySelector("#toggleXray").setAttribute("aria-pressed", String(xrayMode));
+      document.querySelector("#toggleFade").setAttribute("aria-pressed", String(fadeOthers));
+      document.querySelector("#toggleLabels").setAttribute("aria-pressed", String(labelsVisible));
+      document.querySelector("#toggleAnswers").setAttribute("aria-pressed", String(answerHidden));
+      document.querySelector("#toggleRotate").setAttribute("aria-pressed", String(autoRotate));
+    }
+
+    function updateAllState() {
+      updateVisibility();
+      updateMaterials();
+      updateListState();
+      updateLabels();
+    }
+
+    function showAll() {
+      isolated = false;
+      hiddenStructures.clear();
+      activeGroupId = null;
+      updateAllState();
+    }
+
+    function restoreColor() {
+      xrayMode = false;
+      fadeOthers = false;
+      fadedStructures.clear();
+      updateAllState();
+    }
+
+    function resetAll() {
+      hiddenStructures.clear();
+      fadedStructures.clear();
+      isolated = false;
+      xrayMode = false;
+      fadeOthers = false;
+      labelsVisible = false;
+      answerHidden = false;
+      activeGroupId = null;
+      applyPreset("overview", { keepSelection: false });
+    }
+
+    function isolateSelected() {
+      if (!selectedId) return;
+      isolated = true;
+      activePresetId = null;
+      viewBanner.innerHTML = `<strong>单独查看</strong>：${structureById.get(selectedId).name_zh}，保留少量相关上下文。`;
+      updateAllState();
+    }
+
+    function toggleGroup(groupId) {
+      const group = groups.find((item) => item.id === groupId);
+      if (!group) return;
+      activeGroupId = activeGroupId === groupId ? null : groupId;
+      if (activeGroupId) {
+        const visible = new Set(group.ids);
+        hiddenStructures.clear();
+        data.structures.forEach((item) => {
+          if (!visible.has(item.id)) hiddenStructures.add(item.id);
+        });
+        isolated = false;
+        activePresetId = null;
+        viewBanner.innerHTML = `<strong>${group.name}</strong>：仅显示这一组结构。`;
+        selectStructure(group.ids[0], { keepIsolation: true });
+      } else {
+        showAll();
+      }
+      updateAllState();
+    }
+
+    function applyRelated() {
+      if (!selectedId) return;
+      hiddenStructures.clear();
+      const visible = new Set([selectedId, ...(contextMap[selectedId] || [])]);
+      data.structures.forEach((item) => {
+        if (!visible.has(item.id)) hiddenStructures.add(item.id);
+      });
+      isolated = false;
+      activeGroupId = null;
+      activePresetId = null;
+      viewBanner.innerHTML = `<strong>相关结构</strong>：围绕 ${structureById.get(selectedId).name_zh} 显示解剖上下文。`;
+      updateAllState();
+    }
+
+    function applyPreset(id, options = {}) {
+      const preset = presets.find((item) => item.id === id);
+      if (!preset) return;
+      activePresetId = id;
+      activeGroupId = null;
+      isolated = false;
+      if (searchInput.value) {
+        searchInput.value = "";
+        renderStructureList();
+      }
+      hiddenStructures.clear();
+      fadedStructures.clear();
+      xrayMode = false;
+      fadeOthers = false;
+      labelsVisible = !!preset.labels;
+      answerHidden = false;
+      (preset.fade || []).forEach((sid) => fadedStructures.add(sid));
+      if (preset.opticsState) {
+        Object.assign(opticsState, preset.opticsState);
+        accommodationSlider.value = String(Math.round(opticsState.accommodation * 100));
+        distanceSlider.value = String(Math.round(opticsState.objectDistance * 100));
+        applyOpticsState();
+      }
+      if (opticsGroup) {
+        opticsGroup.visible = !!preset.optics;
+      }
+      if (preset.frame) {
+        const pose = getCameraPose(preset.frame);
+        moveCamera(pose.position, pose.target);
+      }
+      if (!options.keepSelection) {
+        selectedId = preset.select || selectedId || data.structures[0]?.id;
+        updateDetail();
+      }
+      viewBanner.innerHTML = `<strong>${preset.name}</strong>：${preset.note}`;
+      updateAllState();
+    }
+
+    function moveCamera(position, target) {
+      focusTween = {
+        startPosition: camera.position.clone(),
+        startTarget: controls.target.clone(),
+        endPosition: position,
+        endTarget: target,
+        t: 0
+      };
+    }
+
+    function focusStructure(id) {
+      const objects = objectsByStructure.get(id);
+      if (!objects?.length) return;
+      const box = new THREE.Box3();
+      objects.forEach((obj) => {
+        if (obj.visible) box.expandByObject(obj);
+      });
+      if (box.isEmpty()) objects.forEach((obj) => box.expandByObject(obj));
+      const center = box.getCenter(new THREE.Vector3());
+      const size = Math.max(0.55, box.getSize(new THREE.Vector3()).length());
+      const direction = camera.position.clone().sub(controls.target).normalize();
+      const distance = THREE.MathUtils.clamp(size * 3.2, 3.6, 8.5);
+      moveCamera(center.clone().add(direction.multiplyScalar(distance)), center);
+    }
+
+    function updateFocusTween(dt) {
+      if (!focusTween) return;
+      focusTween.t = Math.min(1, focusTween.t + dt * 2.6);
+      const k = 1 - Math.pow(1 - focusTween.t, 3);
+      camera.position.lerpVectors(focusTween.startPosition, focusTween.endPosition, k);
+      controls.target.lerpVectors(focusTween.startTarget, focusTween.endTarget, k);
+      if (focusTween.t >= 1) focusTween = null;
+    }
+
+    function updateLabels() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const stageRect = stage.getBoundingClientRect();
+      const topbarRect = document.querySelector(".topbar").getBoundingClientRect();
+      const minLabelY = window.matchMedia("(max-width: 980px)").matches
+        ? topbarRect.bottom - stageRect.top + 36
+        : 0;
+      let index = 1;
+      labelElements.forEach((label, id) => {
+        const visibleByState = labelsVisible || id === selectedId;
+        if (!visibleByState || hiddenStructures.has(id)) {
+          label.style.display = "none";
+          return;
+        }
+        if (isolated && id !== selectedId && !(contextMap[selectedId] || []).includes(id)) {
+          label.style.display = "none";
+          return;
+        }
+        const objects = objectsByStructure.get(id);
+        if (!objects?.length) {
+          label.style.display = "none";
+          return;
+        }
+        const box = new THREE.Box3();
+        objects.forEach((obj) => {
+          if (obj.visible) box.expandByObject(obj);
+        });
+        if (box.isEmpty()) {
+          label.style.display = "none";
+          return;
+        }
+        const item = structureById.get(id);
+        label.textContent = answerHidden ? String(index++) : item.name_zh;
+        label.classList.toggle("active", id === selectedId);
+        label.classList.toggle("answer-hidden", answerHidden);
+        const center = box.getCenter(new THREE.Vector3());
+        center.project(camera);
+        const inFront = center.z > -1 && center.z < 1;
+        label.style.display = inFront ? "block" : "none";
+        const labelX = (center.x * 0.5 + 0.5) * w;
+        const labelY = (-center.y * 0.5 + 0.5) * h;
+        label.style.left = `${labelX}px`;
+        label.style.top = `${Math.max(labelY, minLabelY)}px`;
+      });
+    }
+
+    function setPointerFromEvent(event) {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    function pickStructure() {
+      if (!root) return null;
+      raycaster.setFromCamera(pointer, camera);
+      const meshes = [];
+      root.traverse((obj) => {
+        if (obj.isMesh && obj.visible && obj.userData.structure_id) meshes.push(obj);
+      });
+      const hit = raycaster.intersectObjects(meshes, false).find((item) => item.object.userData.structure_id);
+      return hit?.object?.userData?.structure_id || null;
+    }
+
+    function resize() {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const needResize = canvas.width !== Math.floor(width * renderer.getPixelRatio()) ||
+        canvas.height !== Math.floor(height * renderer.getPixelRatio());
+      if (needResize) renderer.setSize(width, height, false);
+      camera.aspect = width / Math.max(1, height);
+      camera.updateProjectionMatrix();
+    }
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!root) return;
+      setPointerFromEvent(event);
+      const nextHover = pickStructure();
+      if (nextHover !== hoverId) {
+        hoverId = nextHover;
+        updateMaterials();
+      }
+      canvas.classList.toggle("clickable", !!hoverId);
+      if (hoverId) {
+        const item = structureById.get(hoverId);
+        tooltip.style.display = "block";
+        tooltip.style.left = `${event.clientX - canvas.getBoundingClientRect().left}px`;
+        tooltip.style.top = `${event.clientY - canvas.getBoundingClientRect().top}px`;
+        tooltip.textContent = answerHidden ? "可选结构" : `${item.name_zh} ${item.name_en}`;
+      } else {
+        tooltip.style.display = "none";
+      }
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      hoverId = null;
+      tooltip.style.display = "none";
+      canvas.classList.remove("clickable");
+      updateMaterials();
+    });
+
+    canvas.addEventListener("pointerdown", (event) => {
+      setPointerFromEvent(event);
+      const id = pickStructure();
+      if (id) selectStructure(id);
+    });
+
+    canvas.addEventListener("dblclick", (event) => {
+      setPointerFromEvent(event);
+      const id = pickStructure();
+      if (id) {
+        selectStructure(id);
+        focusStructure(id);
+      }
+    });
+
+    document.querySelector("#resetView").addEventListener("click", resetCameraForActiveView);
+    document.querySelector("#toggleXray").addEventListener("click", () => {
+      xrayMode = !xrayMode;
+      updateAllState();
+    });
+    document.querySelector("#toggleFade").addEventListener("click", () => {
+      fadeOthers = !fadeOthers;
+      updateAllState();
+    });
+    document.querySelector("#toggleLabels").addEventListener("click", () => {
+      labelsVisible = !labelsVisible;
+      updateAllState();
+    });
+    document.querySelector("#toggleAnswers").addEventListener("click", () => {
+      answerHidden = !answerHidden;
+      updateDetail();
+      updateAllState();
+    });
+    document.querySelector("#toggleRotate").addEventListener("click", () => {
+      autoRotate = !autoRotate;
+      updateListState();
+    });
+    document.querySelector("#fullscreen").addEventListener("click", async () => {
+      if (!document.fullscreenElement) {
+        await stage.requestFullscreen?.();
+      } else {
+        await document.exitFullscreen?.();
+      }
+    });
+    document.querySelector("#snapshot").addEventListener("click", () => {
+      renderer.render(scene, camera);
+      const link = document.createElement("a");
+      link.download = `eye-model-3-1-2-${activePresetId || "view"}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+    document.querySelector("#showAll").addEventListener("click", showAll);
+    document.querySelector("#restoreColor").addEventListener("click", restoreColor);
+    document.querySelector("#resetAll").addEventListener("click", resetAll);
+    document.querySelector("#isolateSelected").addEventListener("click", isolateSelected);
+    document.querySelector("#focusSelected").addEventListener("click", () => focusStructure(selectedId));
+    document.querySelector("#relatedSelected").addEventListener("click", applyRelated);
+    searchInput.addEventListener("input", renderStructureList);
+    accommodationSlider.addEventListener("input", () => {
+      opticsState.accommodation = Number(accommodationSlider.value) / 100;
+      applyManualOpticsChange();
+    });
+    distanceSlider.addEventListener("input", () => {
+      opticsState.objectDistance = Number(distanceSlider.value) / 100;
+      applyManualOpticsChange();
+    });
+    eyeModeButtons.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-eye-mode]");
+      if (!btn) return;
+      opticsState.eyeMode = btn.dataset.eyeMode;
+      applyManualOpticsChange();
+    });
+    glassesButtons.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-glasses-mode]");
+      if (!btn) return;
+      opticsState.glassesMode = btn.dataset.glassesMode;
+      applyManualOpticsChange();
+    });
+    retinaImageUpload.addEventListener("change", () => {
+      handleImageUpload(retinaImageUpload.files?.[0]);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      resize();
+      const dt = clock.getDelta();
+      updateFocusTween(dt);
+      if (root && autoRotate && !focusTween) root.rotation.z += dt * 0.10;
+      controls.update();
+      updateLabels();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
